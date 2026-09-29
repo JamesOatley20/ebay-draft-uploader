@@ -1,0 +1,103 @@
+# Python environments and bytecode
+.venv/
+.venv-*/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Build output and development caches
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit.xml
+
+# Credentials and machine-local configuration (including legacy app storage)
+.env
+.env.*
+!.env.example
+!.env.template
+sign-in.bin
+sign-in.bin.*
+tool-path.txt
+credentials.json
+tokens.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Real seller batches and generated app data belong outside the source repo.
+# These names are ignored at any depth; input-template.txt stays versioned.
+.ebay-drafts/
+_ebay/
+items/
+batches/
+batch.json
+listing.json
+input.txt
+output.txt
+draft.csv
+state.json
+result.bin
+submission-guard.json
+recovered-listing.json
+recovered-input.txt
+EBAY_MANIFEST.json
+EBAY_START_HERE.html
+EBAY_README.txt
+EBAY_REVIEW_CHECKLIST.txt
+API-REVIEW.txt
+READ-ME.txt
+
+# Listing photos and package archives, including uppercase camera extensions.
+# Add an explicit exception if a future documentation asset needs versioning.
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[pP][nN][gG]
+*.[wW][eE][bB][pP]
+*.[hH][eE][iI][cC]
+*.[hH][eE][iI][fF]
+*.[mM][pP][oO]
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
+# Logs, crash dumps, temporary files and backup copies
+*.log
+*.dmp
+*.stackdump
+.tmp-*
+*.tmp
+*.bak
+*.backup
+*.old
+*~
+
+# Local editor settings and operating-system files
+.vscode/
+.idea/
+.history/
+*.swp
+*.swo
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,4 @@
+httpx>=0.28,<0.29
+Pillow>=11.3,<13
+pillow-heif>=1.1.1,<2
+certifi>=2024.8.30

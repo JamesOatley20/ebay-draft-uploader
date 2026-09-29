@@ -1,6 +1,6 @@
 # 02 — Build the overlay and hand it over
 
-**Target:** eBay Drafts app 3.0.3 · batch format 3
+**Target:** eBay Drafts app 3.0.4 · batch format 3
 
 This guide starts only after every discovered item has been classified ready or skipped and every proposed `listing.json` has passed the validator in `01-PREPARE-LISTINGS.md`.
 
@@ -73,7 +73,7 @@ The installed app owns local image conversion, preview generation, preparation C
 Keep `READ-ME.txt` short. It must contain:
 - actual ready and skipped counts;
 - a warning that extracting the overlay replaces matching `listing.json`, `output.txt`, `batch.json` and the launcher;
-- app target 3.0.3 / batch version 3;
+- app target 3.0.4 / batch version 3;
 - the beginner next steps from section 6 below;
 - a reminder that preparation/validation is not proof of a live eBay draft.
 
@@ -115,13 +115,11 @@ Tell the seller, in plain English:
 1. Preserve the original photographs and ordinary local preparation. If an old version-2 batch still exists, migrate it through app 3 before extracting a new overlay.
 2. Extract the overlay ZIP **into the original photo-batch folder**, not into a new overlay subfolder.
 3. Double-click `Open-eBay-Drafts.cmd`. If the app has never been installed, run `Setup.cmd` once from the app folder first.
-4. Read the preview and each item's private handoff.
-5. Select **one exact ready item**.
-6. Resolve all previous remote work for that item in Seller Hub **Drafts and Reports** before continuing. An empty Drafts page alone is not enough while Reports may still be processing.
-7. Only after that review, confirm `RESOLVED`, then `DRAFT`.
-8. Enter a Production OAuth **User** token in the app's masked prompt for that session. Never send the token to ChatGPT or place it in files.
-9. Keep the session window open for results.
-10. Review the actual Seller Hub draft, complete the remaining manual fields and policies, and publish only when satisfied.
+4. Read the preview and each item's private handoff if desired. The normal launcher does not ask you to select an item or type approval words.
+5. Enter a Production OAuth **User** token in the app's masked prompt for that session. Never send the token to ChatGPT or place it in files.
+6. The app submits **all ready, unguarded items** sequentially. Guarded items are skipped automatically. The queue stops if an outcome is unsafe to continue.
+7. Keep the session window open for results.
+8. Review the actual Seller Hub drafts, complete the remaining manual fields and policies, and publish only when satisfied.
 
 A local guard is conservative duplicate protection. Do not tell the seller to delete, bypass, rename around or otherwise evade it. If a prior remote outcome is unresolved, do not recommend another upload. After the remote outcome is genuinely resolved, the app's explicit release action may be used as designed.
 
@@ -134,7 +132,7 @@ Deliver the real downloadable ZIP and keep the user-facing message concise. Incl
 - the ZIP link;
 - any important unresolved question grouped once;
 - the extraction location and first launcher step;
-- the one-item / prior-remote-work / `RESOLVED` / `DRAFT` / session-only User-token sequence;
+- that normal use submits all ready, unguarded items after the single session-only User-token prompt;
 - a reminder to finish manual fields in Seller Hub and review before publishing.
 
 Do not ask for Windows paths. Do not claim a successful upload, a fresh official-template comparison or live API acceptance unless that event was actually observed in the authorised environment.

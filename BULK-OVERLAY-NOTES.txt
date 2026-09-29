@@ -1,0 +1,29 @@
+eBay Drafts 3.0.4 bulk overlay
+Base repository commit: 4c3043c4e6b1a0268bfaff9623b3093201becf42
+
+COPY
+Extract this ZIP over the eBay app/repository folder, preserving paths.
+
+WHAT CHANGES
+- Normal Open-eBay-Drafts.cmd use submits every ready, unguarded item in batch.json.
+- No "Exact ready item folder name", RESOLVED or DRAFT console confirmations.
+- The only normal authentication interaction is the existing masked Production OAuth User-token prompt.
+- --item remains available as an optional advanced single-item mode.
+- Local submission guards remain in force; guarded items are skipped, not resent.
+- The queue still stops on a rejected/uncertain item rather than blindly continuing after an unsafe result.
+- FixedPrice pricing is unchanged on the wire: listing.json price_gbp is written to eBay's Start price column, which is the purchase / Buy It Now price for FixedPrice listings.
+- If no explicit seller Best Offer values are supplied, the local handoff now shows BOTH minimum and auto-accept at 90% of asking price, rounded to the nearest penny.
+- Best Offer thresholds are NOT added to the Draft CSV because eBay's documented Create Drafts template does not define those columns and cautions against adding unsupported columns.
+- The six-field listing.json contract and FX_LISTING / schema 1.0 / Draft serializer are unchanged.
+
+FILES
+run.py
+ebay_drafts/__init__.py
+ebay_drafts/notes.py
+ebay_drafts/workflow.py
+tests/test_bulk_defaults.py
+chatgpt/PROJECT-INSTRUCTIONS.txt
+chatgpt/01-PREPARE-LISTINGS.md
+chatgpt/02-BUILD-OVERLAY.md
+
+No credentials, tokens, guards, account data or batch/item files are included.

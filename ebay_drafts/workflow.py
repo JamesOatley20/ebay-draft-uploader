@@ -80,7 +80,6 @@ def prepare_item(root: Path, folder: Path) -> PreparedItem:
         raise AppError("Provide 1 to 12 photos for this item.")
     if len({p.name.casefold() for p in candidates}) != len(candidates):
         raise AppError("Two photo names differ only by capitals. Give them distinct names.")
-    # Remember absence as well as content, so adding notes after review is detected.
     item.input_hashes = {"listing.json": sha256(listing_bytes).hexdigest(),
                          "input.txt": sha256(notes_bytes).hexdigest() if notes_bytes is not None else None}
     research_path = folder / "output.txt"
@@ -99,7 +98,6 @@ def prepare_item(root: Path, folder: Path) -> PreparedItem:
     update_preparation(folder, ["Offline checks passed. No eBay request was made.",
                                 "draft.csv is a preparation export without uploaded photo URLs.",
                                 "Main photo: " + item.photos[0][0], *photo_notes], listing, notes)
-    # output.txt is part of the review too: it contains private prices and postage guidance.
     item.input_hashes["output.txt"] = sha256(read_bytes(folder / "output.txt", 256_000)).hexdigest()
     return item
 
@@ -148,7 +146,7 @@ def write_preview(root: Path, items: list[PreparedItem], problems: dict[str, str
              'table{border-collapse:collapse;width:100%;font-size:15px}th,td{border:1px solid #bbb;padding:8px;text-align:left;vertical-align:top}',
              'pre{white-space:pre-wrap;overflow-wrap:anywhere;font:15px/1.5 system-ui}td{overflow-wrap:anywhere}',
              '</style><h1>Your local draft preparation</h1>',
-             '<p>This preview contains local preparation only. It does not record upload outcomes. Review Seller Hub before another attempt.</p>']
+             '<p>This preview contains local preparation only. It does not record upload outcomes. Guarded items are not automatically resubmitted.</p>']
     for item in items:
         listing = item.listing
         price = f'GBP {listing.price_gbp:.2f}' if listing.price_gbp is not None else 'Price to be added on eBay'
@@ -160,7 +158,7 @@ def write_preview(root: Path, items: list[PreparedItem], problems: dict[str, str
             relative = photo.relative_to(workspace(root)).as_posix()
             parts.append(f'<img src="{escape(relative, quote=True)}" alt="{escape(name, quote=True)}">')
         parts += ['<h3>What the app sends / what you must finish</h3>',
-                  '<p>Planned values only — this is NOT proof of upload. Offer thresholds, parcel details and postage are not sent by this draft route.</p>',
+                  '<p>Planned values only — this is NOT proof of upload. For FixedPrice drafts, the Start price column is the Buy It Now purchase price. Best Offer thresholds, parcel details and postage are not sent by this draft route.</p>',
                   '<table><thead><tr><th>Field</th><th>Value</th><th>Destination</th><th>Source</th></tr></thead><tbody>']
         for row in handoff_rows(listing, item.notes, item.research):
             parts.append('<tr>' + ''.join('<td>' + escape(value) + '</td>'
@@ -170,7 +168,7 @@ def write_preview(root: Path, items: list[PreparedItem], problems: dict[str, str
             parts.append('<p><strong>' + escape(warning) + '</strong></p>')
         parts += ['<h3>Seller notes — not uploaded separately</h3><pre>' + escape(item.notes.original or 'No input.txt notes supplied.') + '</pre>',
                   '<h3>Full preparation / research notes — not uploaded</h3><pre>' + escape(item.research or 'No authored output.txt notes supplied.') + '</pre>',
-                  '<p>Older free-form guidance is shown in full above; it is not guessed into settings. No offer thresholds are enabled automatically.</p>',
+                  '<p>If no explicit Best Offer thresholds are supplied, the app shows 90% of asking price as the manual minimum and auto-accept guidance. Those settings are not transmitted by this Draft CSV.</p>',
                   f'<p><a href="{escape((item.folder / "output.txt").as_uri(), quote=True)}">Open output.txt</a></p></article>']
     for name, reason in problems.items():
         parts.append('<article><h2>' + escape(name) + '</h2><p>Not ready: ' + escape(reason) + '</p></article>')
@@ -207,7 +205,6 @@ def submit_item(api: Ebay, item: PreparedItem, emit=lambda status, messages: Non
     if is_guarded(item.output):
         return SessionResult(item.folder.name, "guarded")
     check_reviewed_files(item)
-    # Only fixed LOCAL bytes are written after authentication. No response affects them.
     arm_guard(item.output)
     runtime = RuntimeItem()
     try:
@@ -227,7 +224,6 @@ def submit_item(api: Ebay, item: PreparedItem, emit=lambda status, messages: Non
         try:
             api.upload_draft(runtime.task_id, csv_content)
         except UncertainWrite:
-            # While this process lives we can still check the known task.
             emit("pending", ["Upload acknowledgement was uncertain. Checking the same task without resending."])
         poll_task(api, runtime, emit)
         return SessionResult(item.folder.name, runtime.status, runtime.messages)
@@ -262,8 +258,6 @@ def submit_batch(api: Ebay, items: list[PreparedItem], emit=lambda result: None)
             except (AppError, OSError):
                 result = SessionResult(item.folder.name, "needs_review", ["The session could not safely complete this item. Check Seller Hub before another attempt."])
                 stopped = True
-            # A row rejection can indicate a problem with the shared feed route,
-            # not just this item's fields. Do not send the rest of the batch.
             if result.status in {"rejected", "needs_review"}:
                 stopped = True
         results.append(result)

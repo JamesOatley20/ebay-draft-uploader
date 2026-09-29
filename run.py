@@ -74,7 +74,7 @@ def main() -> int:
     parser = PrivateArgumentParser(description="Create eBay UK drafts with session-only authentication. Nothing is published.")
     parser.add_argument("--batch", type=Path, help="Folder containing batch.json and item folders")
     parser.add_argument("--item", metavar="ITEM_FOLDER",
-                        help="Select exactly one ready item without changing batch.json or releasing its guard")
+                        help="Optional advanced mode: submit exactly one ready item instead of the whole ready batch")
     parser.add_argument("--compare-template", type=Path, metavar="CSV",
                         help="Offline comparison of a blank, freshly downloaded UK draft template; never uploads")
     parser.add_argument("--migration-batch", action="append", type=Path, default=[],
@@ -85,6 +85,7 @@ def main() -> int:
     actions.add_argument("--release", metavar="ITEM_FOLDER", help="Release a local guard after manually resolving the outcome in Seller Hub")
     actions.add_argument("--register", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+
     if args.compare_template:
         if args.batch or args.item or args.preview or args.migrate or args.release or args.register or args.migration_batch:
             raise AppError("Use --compare-template by itself; it never opens an upload session.")
@@ -92,20 +93,24 @@ def main() -> int:
         comparison = compare_template(read_bytes(args.compare_template, 256_000))
         print("\n".join(comparison.lines))
         return 1 if comparison.different else 0
+
     if args.item and (args.migrate or args.release or args.register):
         raise AppError("--item selects a preview/upload item, not a migration or guard release.")
     if args.migration_batch and not args.migrate:
         raise AppError("--migration-batch can only be used with --migrate.")
+
     if args.register:
         if os.name != "nt" or not os.environ.get("LOCALAPPDATA"):
             raise AppError("Setup.cmd registration is for Windows.")
         write_text(Path(os.environ["LOCALAPPDATA"]) / "eBayDrafts" / "tool-path.txt", str(Path(__file__).resolve()))
         print("Setup complete. Double-click Start.cmd to begin.")
         return 0
+
     if args.migrate:
         return migrate(([args.batch] if args.batch else []) + args.migration_batch)
+
     if not args.batch and not args.preview and not args.release and not args.item:
-        print(f"\neBay Drafts {__version__}\n1. Open a batch and review/create drafts\n2. Review migration of old data\n3. Release an item after checking Seller Hub\nEnter. Exit")
+        print(f"\neBay Drafts {__version__}\n1. Open a batch and create all ready drafts\n2. Review migration of old data\n3. Release an item after checking Seller Hub\nEnter. Exit")
         choice = input("Choose: ").strip()
         if choice == "2":
             return migrate([pick_batch()])
@@ -114,12 +119,15 @@ def main() -> int:
             args.release = input("Exact item folder name: ").strip()
         elif choice != "1":
             return 0
+
     root = batch_root(args.batch or pick_batch())
     from ebay_drafts.migration import app_storage, require_clean
     from ebay_drafts.guards import is_guarded, release_guard
     from ebay_drafts.workflow import prepare_batch
+
     with batch_lock(root):
         require_clean(root, app_storage())
+
         if args.release:
             folder = root / component(args.release)
             check_path(folder)
@@ -131,51 +139,50 @@ def main() -> int:
                 release_guard(workspace(root, folder.name))
                 print("Local guard released. Review the item again before a new attempt.")
             return 0
+
         reviewed_batch = read_bytes(root / "batch.json", 256_000)
         items, problems = prepare_batch(root)
         ready = [item for item in items if not is_guarded(item.output)]
+
         if args.item:
             selected = component(args.item)
             ready = [item for item in ready if item.folder.name == selected]
             if len(ready) != 1:
                 raise AppError("Selected item is not ready and unguarded in this batch. Nothing was uploaded.")
-            print("Selected single item: " + selected + ". Other items will not be submitted.")
+            print("Advanced single-item mode: " + selected + ".")
+        else:
+            print(f"Batch mode: all {len(ready)} ready, unguarded item(s) will be submitted in this session.")
+
         print(f"\nReady for a new attempt: {len(ready)}. Held by local guards: {sum(is_guarded(item.output) for item in items)}. Need preparation: {len(problems)}.")
         for name, reason in problems.items():
             print(name + ": " + reason)
+
         preview = workspace(root) / "preview.html"
         print("Local preparation: " + str(preview))
+
         if args.preview:
             print("Offline preview only. No eBay connection was made.")
             return 1 if problems else 0
+
         webbrowser.open(preview.as_uri())
+
         if not ready:
-            print("No unguarded items are ready. Review Seller Hub before releasing an item.")
+            print("No unguarded items are ready. Review Seller Hub before releasing any guarded item.")
             return 1 if problems else 0
-        print("Review the preparation. A token is needed for this run. Closing loses task references; remote work may continue.")
-        if not args.item:
-            # Default interactive use also requires an exact selection. An API integration
-            # that has never been verified live must not silently send the whole batch.
-            print("Draft feed compatibility remains unverified. Select ONE item for this session.")
-            selected = input("Exact ready item folder name, or Enter to stop: ").strip()
-            if not selected:
-                return 0
-            ready = [item for item in ready if item.folder.name == selected]
-            if len(ready) != 1:
-                raise AppError("That exact folder is not ready and unguarded. Nothing was uploaded.")
-        print("Before any new attempt, resolve ALL previous uploads in Seller Hub Drafts and Reports.")
-        print("An absent draft is not proof of failure while remote work may still be processing.")
-        if input("Type RESOLVED only after that review, or Enter to stop: ").strip() != "RESOLVED":
-            print("Stopped before authentication. Existing guards are unchanged.")
-            return 0
-        if input("Type DRAFT to continue, or press Enter to stop: ").strip() != "DRAFT":
-            print("Stopped before authentication. Nothing was uploaded.")
-            return 0
+
+        # No folder-selection / RESOLVED / DRAFT ceremony for a normal batch.
+        # Existing local guards are the duplicate-protection boundary: guarded items
+        # are excluded above and can only be released through the explicit release action.
+        print("A Production OAuth User token is needed for this run. Close the token prompt to cancel.")
+        print("The queue submits ready items sequentially and stops if an outcome becomes unsafe to continue.")
+
         if read_bytes(root / "batch.json", 256_000) != reviewed_batch:
             raise AppError("The batch changed during review. Start again.")
+
         require_clean(root, app_storage())
         from ebay_drafts.session_ui import run_session
         results = run_session(ready)
+
         # Only a fixed message goes to redirectable output; results stay in native UI.
         print("Session window closed. Check Seller Hub before another attempt. output.txt contains preparation only.")
         if any(result.status in {"error", "rejected", "needs_review"} for result in results):

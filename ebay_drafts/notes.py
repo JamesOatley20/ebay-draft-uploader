@@ -1,7 +1,7 @@
 """Read the seller's notes and keep private information out of the advert."""
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 import re
 
@@ -11,6 +11,7 @@ from .listing import Listing
 DEFAULT_CONDITION = "Not provided. Confirm the item's condition before publishing."
 STATUS_MARKER = "=== APP STATUS (replaced on each run) ==="
 PREPARATION_MARKER = "=== LOCAL PREPARATION (replaced on each run) ==="
+OFFER_PERCENT = Decimal("0.90")
 
 
 def section_start(content: bytes, marker: str) -> int | None:
@@ -39,7 +40,7 @@ class SellerNotes:
     @classmethod
     def read(cls, folder: Path) -> "SellerNotes":
         path = folder / "input.txt"
-        check_path(path)  # A missing file is allowed; a link or unreadable file is not.
+        check_path(path)
         if path.exists():
             return cls.parse(read_text(path, 32_000))
         return cls.parse("", missing_file=True)
@@ -91,13 +92,16 @@ def update_preparation(folder: Path, messages: list[str],
         lines += ["", "FIELD HANDOFF — planned values, NOT an upload result"]
         for row in handoff_rows(listing, notes, private_notes):
             lines.append(f"{row.label}: {row.value} | {row.destination} | Source: {row.source}")
-        lines.append("No offer thresholds are calculated or enabled automatically.")
+        lines.append("Best Offer guidance defaults to 90% of asking price when no explicit seller threshold is supplied; this draft route does not send those settings.")
     if listing:
         lines += ["", f"Title: {listing.title}", f"Category ID: {listing.category_id}"]
         if listing.price_gbp is None:
             lines.append("Price: MISSING. Set your asking price in Seller Hub before publishing.")
         else:
-            lines.append(f"Asking price: GBP {listing.price_gbp:.2f} (sent as Start price, not Buy It Now price).")
+            lines.append(
+                f"Asking price: GBP {listing.price_gbp:.2f} "
+                "(sent as the FixedPrice Buy It Now amount in eBay's Start price column)."
+            )
         if listing.condition_id is None:
             lines.append("Condition code: not sent. Select the category's correct used/good condition in Seller Hub, unless your notes say otherwise.")
         else:
@@ -113,7 +117,7 @@ def update_preparation(folder: Path, messages: list[str],
         lines += ["", *notes.missing]
     lines += ["", "FINISH ON EBAY", "Review the photos, description, category, condition and asking price.",
               "Complete item specifics, delivery/collection, parcel details, dispatch time, location and account policies as applicable.",
-              "Separate condition notes and Best Offer settings are not sent by this app.",
+              "Best Offer minimum and auto-accept guidance are shown locally but are not sent by this draft route.",
               "Only title, category, price (when known), condition code (when known), description, quantity and photos are sent.",
               "The app never publishes. Nothing in this file is appended to your advert."]
     separator = "" if not private_notes or private_notes.endswith("\n\n") else "\n\n"
@@ -144,6 +148,12 @@ def labelled_values(content: str) -> dict[str, str]:
             for key, entries in values.items()}
 
 
+def _is_placeholder(value: str) -> bool:
+    """Treat generated 'not provided' handoff text as absent, not as a seller override."""
+    normal = value.strip().casefold()
+    return normal.startswith("not provided") or normal.startswith("missing")
+
+
 def handoff_rows(listing: Listing, notes: SellerNotes, research: str = "") -> list[HandoffRow]:
     """Explain every sent field and the private settings left for Seller Hub.
 
@@ -164,12 +174,30 @@ def handoff_rows(listing: Listing, notes: SellerNotes, research: str = "") -> li
                 return HandoffRow(label, value, manual, source)
         return HandoffRow(label, missing, manual, "Not supplied")
 
+    def offer_guidance(label: str, *aliases: str) -> HandoffRow:
+        keys = [label.casefold(), *(alias.casefold() for alias in aliases)]
+        for values, source in ((seller, "input.txt (seller)"), (authored, "output.txt (preparation guidance)")):
+            found = [values[key] for key in keys if key in values and not _is_placeholder(values[key])]
+            found = list(dict.fromkeys(found))
+            if found:
+                value = found[0] if len(found) == 1 else "CONFLICT — " + " / ".join(found)
+                return HandoffRow(label, value, manual, source)
+        if listing.price_gbp is None:
+            return HandoffRow(label, "No asking price; set manually in Seller Hub.", manual, "Not supplied")
+        threshold = (listing.price_gbp * OFFER_PERCENT).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return HandoffRow(
+            label,
+            f"{threshold:.2f}",
+            manual,
+            "Seller standing rule — 90% of listing.json asking price",
+        )
+
     rows = [
         HandoffRow("Title", listing.title, sent, "listing.json"),
         HandoffRow("Category ID", listing.category_id, sent, "listing.json"),
         HandoffRow("Asking price (GBP)", f"{listing.price_gbp:.2f}" if listing.price_gbp is not None
                    else "MISSING — no price will be sent.", sent if listing.price_gbp is not None else manual,
-                   "listing.json → Start price (FixedPrice)"),
+                   "listing.json → FixedPrice Buy It Now amount (eBay CSV: Start price)"),
         HandoffRow("Condition ID", str(listing.condition_id) if listing.condition_id is not None
                    else "MISSING — choose the category's condition.", sent if listing.condition_id is not None else manual,
                    "listing.json"),
@@ -178,8 +206,8 @@ def handoff_rows(listing: Listing, notes: SellerNotes, research: str = "") -> li
         HandoffRow("Photos", "The reviewed original photos, converted to JPEG copies.", sent, "Item folder"),
         guidance("Price guidance (GBP)", "Asking price (GBP)", "Suggested price (GBP)", "Price (GBP)",
                  missing="No separate guidance. The asking price above is the ONLY price the app sends."),
-        guidance("Best Offer minimum (GBP)", "Minimum offer (GBP)", "Offers accepted above (GBP)"),
-        guidance("Best Offer auto-accept (GBP)", "Auto-accept offer (GBP)", "Auto accept (GBP)"),
+        offer_guidance("Best Offer minimum (GBP)", "Minimum offer (GBP)", "Offers accepted above (GBP)"),
+        offer_guidance("Best Offer auto-accept (GBP)", "Auto-accept offer (GBP)", "Auto accept (GBP)"),
         guidance("Package dimensions (cm)", missing="MISSING — measure the PACKED parcel in cm."),
         guidance("Package weight (kg)", missing="MISSING — weigh the PACKED parcel in kg."),
         guidance("Postage service", "Delivery service", "Postage"),

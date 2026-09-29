@@ -1,6 +1,6 @@
 # 01 — Prepare listings
 
-**Target:** eBay Drafts app 3.0.3 · eBay UK · GBP · batch format 3
+**Target:** eBay Drafts app 3.0.4 · eBay UK · GBP · batch format 3
 
 This guide covers intake, evidence review, identification, category and price research, buyer copy, `listing.json`, `output.txt`, and per-item validation.
 
@@ -148,7 +148,7 @@ CHECK BEFORE PUBLISHING
 [Only unresolved facts, missing manual settings, material uncertainties or known corrections.]
 ```
 
-Fill known values. For unknown manual fields use clear wording such as `Not provided — set in Seller Hub` or `Not provided — measure packed parcel`. Preserve explicit seller offer thresholds exactly. A minimum acceptable offer is not the same as auto-accept. Never invent 80%/90% or other percentage rules.
+Fill known values. For unknown manual fields use clear wording such as `Not provided — set in Seller Hub` or `Not provided — measure packed parcel`. Preserve explicit seller offer thresholds exactly. If no per-item threshold is supplied and price_gbp is known, use the seller's standing rule for the private handoff: Best Offer minimum = 90% of asking price and Best Offer auto-accept = 90% of asking price, rounded to the nearest penny. Explicit per-item values override this rule. These values are manual Seller Hub guidance unless the current verified draft route supports them.
 
 `Price guidance (GBP)` is private guidance; `listing.json.price_gbp` remains the sole asking price the app sends. Keep those values consistent when a price has been selected.
 

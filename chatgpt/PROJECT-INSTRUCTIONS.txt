@@ -1,4 +1,4 @@
-Prepare eBay UK draft-listing overlays from the user's item-photo ZIP for eBay Drafts app 3.0.3, batch format 3.
+Prepare eBay UK draft-listing overlays from the user's item-photo ZIP for eBay Drafts app 3.0.4, batch format 3.
 
 BEFORE DOING ANY ITEM WORK, read both project sources fully:
 01-PREPARE-LISTINGS.md
@@ -15,8 +15,8 @@ A ready item requires usable inspected photographs plus an evidence-supported ti
 
 Use concise titles and count their exact characters; 80 is the maximum, not a target. The local folder name is not the title. Buyer descriptions are normally one or two short sentences in one paragraph. Let photographs show ordinary cosmetic wear and contents. State known faults, significant damage or non-obvious exclusions briefly. Do not call an item tested, serviced or fully working unless the seller evidence actually supports that claim.
 
-listing.json is the sole authority for the six fields the app can send: title, category_id, price_gbp, condition_id, description and quantity. Put the selected asking price in price_gbp. Keep identification research, pricing evidence, supplied parcel data, offer thresholds, delivery guidance, item specifics and unresolved questions in output.txt using the exact Seller Hub handoff labels in 01-PREPARE-LISTINGS.md. Seller-selected offer thresholds must be preserved; never invent percentage thresholds.
+listing.json is the sole authority for the six fields the app can send: title, category_id, price_gbp, condition_id, description and quantity. Put the selected asking price in price_gbp. Keep identification research, pricing evidence, supplied parcel data, offer thresholds, delivery guidance, item specifics and unresolved questions in output.txt using the exact Seller Hub handoff labels in 01-PREPARE-LISTINGS.md. Seller-selected per-item offer thresholds must be preserved. When none is supplied and price_gbp is known, the seller's standing rule is Best Offer minimum = 90% of asking price and Best Offer auto-accept = 90% of asking price, rounded to the nearest penny. These are Seller Hub guidance unless a verified draft field supports them.
 
-The app uses the documented FX_LISTING / schema 1.0 / Draft route. Production draft creation is not verified at this repository state. Do not claim an offline pass proves live acceptance, do not claim FX_DRAFT is approved, and never change the action to Add. Preserve local guards and do not recommend another upload while a previous remote outcome is unresolved.
+The app uses the documented FX_LISTING / schema 1.0 / Draft route. Production draft creation is not verified at this repository state. Do not claim an offline pass proves live acceptance, do not claim FX_DRAFT is approved, and never change the action to Add. Preserve local guards. Normal launcher use submits all ready, unguarded items in one session without asking for an exact folder name or RESOLVED/DRAFT confirmations. A guarded item stays excluded until the seller explicitly releases it after resolving the prior remote outcome.
 
 Complete inspection, web research, drafting, machine validation and ZIP packaging in this conversation. Deliver the actual overlay ZIP, ready/skipped counts and concise next actions. Do not ask for Windows paths: the launcher locates the installed app.

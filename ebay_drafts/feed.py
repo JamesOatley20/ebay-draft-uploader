@@ -12,6 +12,19 @@ import zipfile
 from . import AppError
 from .listing import Listing
 
+# Keep the create/poll route together. Public eBay documentation still specifies
+# FX_LISTING; FX_DRAFT has not been officially verified for EBAY_GB.
+DRAFT_FEED_TYPE = "FX_LISTING"
+DRAFT_SCHEMA_VERSION = "1.0"
+MARKETPLACE = "EBAY_GB"
+DRAFT_ROUTE_HELP = (
+    "Draft task routing failed (BAF.Error.5). This does not identify a problem with "
+    "the product description or price. The queue has stopped and the local guard remains. "
+    "Resolve the prior task in Seller Hub Reports, then ask eBay Developer Support "
+    "to confirm the draft feed type/schema for EBAY_GB and compare a fresh UK draft "
+    "template. FX_DRAFT is unverified here. Do not switch to Add or blindly retry."
+)
+
 ACTION = "Action(SiteID=UK|Country=GB|Currency=GBP|CC=UTF-8)"
 HEADERS = [ACTION, "Custom label (SKU)", "Category ID", "Title", "Condition ID",
            "Item photo URL", "Description", "Format", "Quantity", "Start price"]
@@ -33,7 +46,7 @@ def is_preparation_csv(content: bytes) -> bool:
         assert_draft_only(content)
         rows = list(csv.reader(StringIO(content.decode("utf-8-sig"))))
         return rows[1][5] == ""
-    except (AppError, UnicodeError, csv.Error, ValueError):
+    except (AppError, UnicodeError, csv.Error, ValueError, IndexError):
         return False
 
 
@@ -106,9 +119,11 @@ def parse_result(content: bytes) -> Result:
             value = payload.decode("cp1252").strip()
         if not value:
             return Result("unknown", ["Empty result file."])
-        if value.startswith("<"):
-            return _xml_result(value)
-        return _csv_result(value)
+        result = _xml_result(value) if value.startswith("<") else _csv_result(value)
+        if ("baf.error.5" in value.lower()
+                or "unable to find task action id for task draft" in value.lower()):
+            return Result("rejected", [*result.messages, DRAFT_ROUTE_HELP])
+        return result
     except (AppError, UnicodeError, csv.Error, ElementTree.ParseError, ValueError) as exc:
         return Result("unknown", [f"Could not safely interpret the result: {exc}"])
 

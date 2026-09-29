@@ -8,12 +8,12 @@ from pathlib import Path
 from . import AppError, SessionStopped
 from .auth import AuthExpired
 from .ebay import APIError, Ebay, UncertainWrite, cache_is_fresh
-from .feed import make_preparation_csv, make_upload_csv, parse_result
-from .files import read_bytes, write_bytes, write_text, workspace, load_batch
+from .feed import DRAFT_FEED_TYPE, make_preparation_csv, make_upload_csv, parse_result
+from .files import read_bytes, check_path, write_bytes, write_text, workspace, load_batch
 from .guards import arm_guard, is_guarded
 from .images import PHOTO_EXTENSIONS, UNSUPPORTED_PHOTO_EXTENSIONS, MAX_SOURCE_BYTES, Photo, normalize_photo
 from .listing import Listing, read_json
-from .notes import SellerNotes, update_preparation
+from .notes import SellerNotes, authored_prefix, handoff_rows, update_preparation
 
 STATUS_TEXT = {
     "working": "Working. Keep this window open to receive the result.",
@@ -35,7 +35,8 @@ class PreparedItem:
     listing: Listing
     notes: SellerNotes
     photos: list[tuple[str, Path, str]] = field(default_factory=list)
-    input_hashes: dict[str, str] = field(default_factory=dict)
+    input_hashes: dict[str, str | None] = field(default_factory=dict)
+    research: str = ""
 
 
 @dataclass(repr=False)
@@ -56,7 +57,14 @@ class SessionResult:
 
 def prepare_item(root: Path, folder: Path) -> PreparedItem:
     output = workspace(root, folder.name)
-    notes = SellerNotes.read(folder)
+    input_path = folder / "input.txt"
+    check_path(input_path)
+    notes_bytes = read_bytes(input_path, 32_000) if input_path.exists() else None
+    try:
+        notes = SellerNotes.parse(notes_bytes.decode("utf-8-sig") if notes_bytes is not None else "",
+                                  missing_file=notes_bytes is None)
+    except UnicodeError:
+        raise AppError("Save input.txt as UTF-8.") from None
     listing_bytes = read_bytes(folder / "listing.json", 256_000)
     try:
         listing = Listing.parse(read_json(listing_bytes.decode("utf-8-sig")))
@@ -72,8 +80,12 @@ def prepare_item(root: Path, folder: Path) -> PreparedItem:
         raise AppError("Provide 1 to 12 photos for this item.")
     if len({p.name.casefold() for p in candidates}) != len(candidates):
         raise AppError("Two photo names differ only by capitals. Give them distinct names.")
-    notes_bytes = read_bytes(folder / "input.txt", 32_000)
-    item.input_hashes = {"listing.json": sha256(listing_bytes).hexdigest(), "input.txt": sha256(notes_bytes).hexdigest()}
+    # Remember absence as well as content, so adding notes after review is detected.
+    item.input_hashes = {"listing.json": sha256(listing_bytes).hexdigest(),
+                         "input.txt": sha256(notes_bytes).hexdigest() if notes_bytes is not None else None}
+    research_path = folder / "output.txt"
+    if research_path.exists():
+        item.research = authored_prefix(read_bytes(research_path, 256_000)).decode("utf-8-sig")
     photo_notes = []
     for index, path in enumerate(candidates, 1):
         source = read_bytes(path, MAX_SOURCE_BYTES)
@@ -87,16 +99,21 @@ def prepare_item(root: Path, folder: Path) -> PreparedItem:
     update_preparation(folder, ["Offline checks passed. No eBay request was made.",
                                 "draft.csv is a preparation export without uploaded photo URLs.",
                                 "Main photo: " + item.photos[0][0], *photo_notes], listing, notes)
+    # output.txt is part of the review too: it contains private prices and postage guidance.
+    item.input_hashes["output.txt"] = sha256(read_bytes(folder / "output.txt", 256_000)).hexdigest()
     return item
 
 
 def check_reviewed_files(item: PreparedItem) -> None:
     photos = {p.name for p in item.folder.iterdir() if not p.name.startswith(".")
               and p.suffix.lower() in PHOTO_EXTENSIONS | UNSUPPORTED_PHOTO_EXTENSIONS}
-    if photos != set(item.input_hashes) - {"listing.json", "input.txt"}:
+    if photos != set(item.input_hashes) - {"listing.json", "input.txt", "output.txt"}:
         raise AppError("The photos changed during review. Close this run and preview again.")
     for name, digest in item.input_hashes.items():
-        if sha256(read_bytes(item.folder / name, MAX_SOURCE_BYTES)).hexdigest() != digest:
+        path = item.folder / name
+        check_path(path)
+        current = sha256(read_bytes(path, MAX_SOURCE_BYTES)).hexdigest() if path.exists() else None
+        if current != digest:
             raise AppError("Local inputs changed during review. Close this run and preview again.")
 
 
@@ -128,6 +145,8 @@ def write_preview(root: Path, items: list[PreparedItem], problems: dict[str, str
              '<title>eBay draft preparation</title><style>body{font:18px/1.5 system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:0 20px}',
              'article{border-top:1px solid #bbb;padding:24px 0}img{max-width:230px;max-height:210px;margin:5px}a{overflow-wrap:anywhere}',
              '.source{font-size:14px;color:#555;overflow-wrap:anywhere}.title-count{font-size:14px;color:#555}',
+             'table{border-collapse:collapse;width:100%;font-size:15px}th,td{border:1px solid #bbb;padding:8px;text-align:left;vertical-align:top}',
+             'pre{white-space:pre-wrap;overflow-wrap:anywhere;font:15px/1.5 system-ui}td{overflow-wrap:anywhere}',
              '</style><h1>Your local draft preparation</h1>',
              '<p>This preview contains local preparation only. It does not record upload outcomes. Review Seller Hub before another attempt.</p>']
     for item in items:
@@ -140,7 +159,19 @@ def write_preview(root: Path, items: list[PreparedItem], problems: dict[str, str
         for name, photo, _ in item.photos:
             relative = photo.relative_to(workspace(root)).as_posix()
             parts.append(f'<img src="{escape(relative, quote=True)}" alt="{escape(name, quote=True)}">')
-        parts.append(f'<p><a href="{escape((item.folder / "output.txt").as_uri(), quote=True)}">Open output.txt</a></p></article>')
+        parts += ['<h3>What the app sends / what you must finish</h3>',
+                  '<p>Planned values only — this is NOT proof of upload. Offer thresholds, parcel details and postage are not sent by this draft route.</p>',
+                  '<table><thead><tr><th>Field</th><th>Value</th><th>Destination</th><th>Source</th></tr></thead><tbody>']
+        for row in handoff_rows(listing, item.notes, item.research):
+            parts.append('<tr>' + ''.join('<td>' + escape(value) + '</td>'
+                         for value in (row.label, row.value, row.destination, row.source)) + '</tr>')
+        parts.append('</tbody></table>')
+        for warning in item.notes.missing:
+            parts.append('<p><strong>' + escape(warning) + '</strong></p>')
+        parts += ['<h3>Seller notes — not uploaded separately</h3><pre>' + escape(item.notes.original or 'No input.txt notes supplied.') + '</pre>',
+                  '<h3>Full preparation / research notes — not uploaded</h3><pre>' + escape(item.research or 'No authored output.txt notes supplied.') + '</pre>',
+                  '<p>Older free-form guidance is shown in full above; it is not guessed into settings. No offer thresholds are enabled automatically.</p>',
+                  f'<p><a href="{escape((item.folder / "output.txt").as_uri(), quote=True)}">Open output.txt</a></p></article>']
     for name, reason in problems.items():
         parts.append('<article><h2>' + escape(name) + '</h2><p>Not ready: ' + escape(reason) + '</p></article>')
     parts.append('</html>')
@@ -152,7 +183,7 @@ def poll_task(api: Ebay, runtime: RuntimeItem, emit) -> None:
     while True:
         api.check_cancelled()
         task = api.get_task(runtime.task_id)
-        if task.get("taskId", runtime.task_id) != runtime.task_id or task.get("feedType", "FX_LISTING") != "FX_LISTING":
+        if task.get("taskId") != runtime.task_id or task.get("feedType") != DRAFT_FEED_TYPE:
             raise AppError("eBay returned a different task. Check Seller Hub.")
         remote = task.get("status")
         if remote in {"COMPLETED", "COMPLETED_WITH_ERROR"}:
@@ -160,8 +191,9 @@ def poll_task(api: Ebay, runtime: RuntimeItem, emit) -> None:
             runtime.status = {"success": "accepted", "rejected": "rejected", "unknown": "needs_review"}[result.status]
             runtime.messages = [api.auth.redact(m[:2000]) for m in result.messages[:20]]
             return
-        if remote in {"FAILED", "ABORTED", "ERROR"} or not isinstance(remote, str):
+        if remote not in {"CREATED", "IN_PROCESS", "QUEUED"}:
             runtime.status = "needs_review"
+            runtime.messages = ["Unrecognised or unsuccessful task state. Check Seller Hub Reports; no task was resent."]
             return
         runtime.status = "pending"
         if attempt == 0:
@@ -212,7 +244,10 @@ def submit_batch(api: Ebay, items: list[PreparedItem], emit=lambda result: None)
         if stopped or api.cancelled():
             result = SessionResult(item.folder.name, "not_attempted")
         else:
-            emit(SessionResult(item.folder.name, "working"))
+            manual = [f"{row.label}: {row.value} — {row.destination}"
+                      for row in handoff_rows(item.listing, item.notes, item.research)
+                      if row.destination.startswith("NOT SENT") or row.label == "Asking price (GBP)"]
+            emit(SessionResult(item.folder.name, "working", ["LOCAL FIELD HANDOFF (not an upload result)", *manual]))
             try:
                 result = submit_item(api, item, lambda status, messages: emit(SessionResult(item.folder.name, status, messages)))
             except SessionStopped:

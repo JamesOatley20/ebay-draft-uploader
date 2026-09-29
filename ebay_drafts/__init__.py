@@ -1,6 +1,6 @@
 """Create eBay UK drafts from local item folders."""
 
-__version__ = "3.0.2"
+__version__ = "3.0.3"
 
 
 class AppError(Exception):

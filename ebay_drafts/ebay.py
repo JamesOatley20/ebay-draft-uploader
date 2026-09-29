@@ -11,6 +11,7 @@ import httpx
 from . import AppError, SessionStopped
 from .auth import Auth, AuthExpired
 from .images import Photo
+from .feed import DRAFT_FEED_TYPE, DRAFT_SCHEMA_VERSION, MARKETPLACE
 
 API_ROOT = "https://api.ebay.com"
 MEDIA_ROOT = "https://apim.ebay.com"
@@ -96,7 +97,7 @@ class Ebay:
         while True:
             self.check_cancelled()
             headers = {"Authorization": "Bearer " + token_function(),
-                       "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB", "Accept": "application/json"}
+                       "X-EBAY-C-MARKETPLACE-ID": MARKETPLACE, "Accept": "application/json"}
             try:
                 with self.client.stream(method, root + path, headers=headers, **kwargs) as wire:
                     parts: list[bytes] = []
@@ -173,7 +174,7 @@ class Ebay:
     def create_task(self) -> str:
         """Only the documented Seller Hub listing feed; never an Inventory offer."""
         response = self.request("POST", FEED_PATH,
-                                json={"feedType": "FX_LISTING", "schemaVersion": "1.0"})
+                                json={"feedType": DRAFT_FEED_TYPE, "schemaVersion": DRAFT_SCHEMA_VERSION})
         return location_id(response.headers.get("Location", ""), FEED_PATH)
 
     def upload_draft(self, task_id: str, csv_content: bytes) -> None:

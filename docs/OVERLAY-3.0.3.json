@@ -1,0 +1,106 @@
+{
+  "base_commit": "8c5ead7924c7664c8644b34432bc3d4712dfb728",
+  "app_version": "3.0.3",
+  "batch_version": 3,
+  "production_draft_creation_verified": false,
+  "fresh_official_uk_template_compared": false,
+  "removed_files": [],
+  "files": [
+    {
+      "path": "README.md",
+      "operation": "replace",
+      "base_git_blob": "a656d95ae87bf1ab1a8d344de25f72be61f52551",
+      "sha256": "323697ac6a278e77aa0d39d336c5b395181f166b681bb02b97b9f67a4456c54b"
+    },
+    {
+      "path": "chatgpt/03-Build-Overlay.md",
+      "operation": "replace",
+      "base_git_blob": "2a519bd4f23e74b47418ce424a81b4ac0464b504",
+      "sha256": "c75ce1bed1c04f1e328ddaf173422619703b98a71931ccdbda6f1d3ccdc5e9e0"
+    },
+    {
+      "path": "chatgpt/04-Resilient-Handoff.md",
+      "operation": "add",
+      "base_git_blob": null,
+      "sha256": "9d08cd1648cc0eb3ab8d2b7f4a013e2bdef15a1c1d0a19975c9f46c89c83fa83"
+    },
+    {
+      "path": "chatgpt/PROJECT-INSTRUCTIONS.txt",
+      "operation": "replace",
+      "base_git_blob": "823d90e48543c014df57e9cf2c47464516704b48",
+      "sha256": "ca214efa575ae9a9aea8ff93cc57568a2f098a556316c46f9d02b69254397f81"
+    },
+    {
+      "path": "docs/DRAFT-FEED-INVESTIGATION.md",
+      "operation": "add",
+      "base_git_blob": null,
+      "sha256": "de16a9baf09c1f236b48b4973251ff7bf4dba86ff2085fb3548c735b31a83e90"
+    },
+    {
+      "path": "docs/INSTALL-OVERLAY-3.0.3.md",
+      "operation": "add",
+      "base_git_blob": null,
+      "sha256": "5af2cb6ba7085d6d0d2333ce6c0e43a2f6626ed6e5b747870a47f2c7fe7e4730"
+    },
+    {
+      "path": "docs/VERIFICATION-3.0.3.md",
+      "operation": "add",
+      "base_git_blob": null,
+      "sha256": "17810b307c73827fc835c63d2f2f5457634571aa3e7fb886abd81f5f2f254e91"
+    },
+    {
+      "path": "ebay_drafts/__init__.py",
+      "operation": "replace",
+      "base_git_blob": "94ecd7bb1f496a9ab25fbc3759b87e08e6d6b12e",
+      "sha256": "ae30decb3d51a48129cb03d2b6641aad903436528ef1d7bd58aa7fe4d523954c"
+    },
+    {
+      "path": "ebay_drafts/ebay.py",
+      "operation": "replace",
+      "base_git_blob": "ab481d935ee02f821dfe8f76fc41bf794c7b8360",
+      "sha256": "048e247a01131869326d033ea4856f0ce285ae48beb8f1e88248d8b3dd0c086a"
+    },
+    {
+      "path": "ebay_drafts/feed.py",
+      "operation": "replace",
+      "base_git_blob": "b6b901bcb43fd04d6cad3a8224a215f7839c3b1c",
+      "sha256": "cd447d88a92aa7bb63422d03588b9f998c41c28b2f7feb7a45dc55131362ee70"
+    },
+    {
+      "path": "ebay_drafts/notes.py",
+      "operation": "replace",
+      "base_git_blob": "c65e0c41891b5fa9e588dfe23a33067d0c621a59",
+      "sha256": "6bf6aa33f4ada0739e1de8fdd4d21faa669811328f1ce2819851a55c454b98ec"
+    },
+    {
+      "path": "ebay_drafts/template_check.py",
+      "operation": "add",
+      "base_git_blob": null,
+      "sha256": "b4c8775ef1111efe30929db44aee43de6274efcc0a18cb6bb4b3d69aabcac93b"
+    },
+    {
+      "path": "ebay_drafts/workflow.py",
+      "operation": "replace",
+      "base_git_blob": "eb60fd192d517e46a3d3ec66fcbc0e4bcdcf8263",
+      "sha256": "f90efb33c72ab07dd905fb5d6e4f28d783920a7d89b809737d39e9845932ae83"
+    },
+    {
+      "path": "input-template.txt",
+      "operation": "replace",
+      "base_git_blob": "a770debaa6b9c6372a9733f93192897a979aaa2a",
+      "sha256": "4645857f7efa6f23c7685f38376e5ba7161c6ecd798228c51d87086ac436241c"
+    },
+    {
+      "path": "run.py",
+      "operation": "replace",
+      "base_git_blob": "e62c04bbaaca405ff6d64a88702e24732a2f546b",
+      "sha256": "8af9a79b947de740e286bb1378c22a3a30420e99fd4523248cfa3f77ebb5ecac"
+    },
+    {
+      "path": "tests/test_draft_fixes.py",
+      "operation": "add",
+      "base_git_blob": null,
+      "sha256": "2f999a53742285eaad3b328c9cb4060884a1aeb9c39df3aec9d3e75800f22511"
+    }
+  ]
+}

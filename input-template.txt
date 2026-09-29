@@ -1,4 +1,12 @@
 Condition:
 Details:
+Asking price (GBP):
 Package dimensions (cm):
 Package weight (kg):
+Best Offer minimum (GBP):
+Best Offer auto-accept (GBP):
+Postage service:
+Postage charged to buyer (GBP):
+Dispatch time:
+Collection:
+Item specifics:

@@ -73,6 +73,10 @@ def migrate(roots: list[Path]) -> int:
 def main() -> int:
     parser = PrivateArgumentParser(description="Create eBay UK drafts with session-only authentication. Nothing is published.")
     parser.add_argument("--batch", type=Path, help="Folder containing batch.json and item folders")
+    parser.add_argument("--item", metavar="ITEM_FOLDER",
+                        help="Select exactly one ready item without changing batch.json or releasing its guard")
+    parser.add_argument("--compare-template", type=Path, metavar="CSV",
+                        help="Offline comparison of a blank, freshly downloaded UK draft template; never uploads")
     parser.add_argument("--migration-batch", action="append", type=Path, default=[],
                         help="Additional explicit batch root, only with --migrate; may be repeated")
     actions = parser.add_mutually_exclusive_group()
@@ -81,6 +85,15 @@ def main() -> int:
     actions.add_argument("--release", metavar="ITEM_FOLDER", help="Release a local guard after manually resolving the outcome in Seller Hub")
     actions.add_argument("--register", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.compare_template:
+        if args.batch or args.item or args.preview or args.migrate or args.release or args.register or args.migration_batch:
+            raise AppError("Use --compare-template by itself; it never opens an upload session.")
+        from ebay_drafts.template_check import compare_template
+        comparison = compare_template(read_bytes(args.compare_template, 256_000))
+        print("\n".join(comparison.lines))
+        return 1 if comparison.different else 0
+    if args.item and (args.migrate or args.release or args.register):
+        raise AppError("--item selects a preview/upload item, not a migration or guard release.")
     if args.migration_batch and not args.migrate:
         raise AppError("--migration-batch can only be used with --migrate.")
     if args.register:
@@ -91,7 +104,7 @@ def main() -> int:
         return 0
     if args.migrate:
         return migrate(([args.batch] if args.batch else []) + args.migration_batch)
-    if not args.batch and not args.preview and not args.release:
+    if not args.batch and not args.preview and not args.release and not args.item:
         print(f"\neBay Drafts {__version__}\n1. Open a batch and review/create drafts\n2. Review migration of old data\n3. Release an item after checking Seller Hub\nEnter. Exit")
         choice = input("Choose: ").strip()
         if choice == "2":
@@ -121,7 +134,13 @@ def main() -> int:
         reviewed_batch = read_bytes(root / "batch.json", 256_000)
         items, problems = prepare_batch(root)
         ready = [item for item in items if not is_guarded(item.output)]
-        print(f"\nReady for a new attempt: {len(ready)}. Held by local guards: {len(items) - len(ready)}. Need preparation: {len(problems)}.")
+        if args.item:
+            selected = component(args.item)
+            ready = [item for item in ready if item.folder.name == selected]
+            if len(ready) != 1:
+                raise AppError("Selected item is not ready and unguarded in this batch. Nothing was uploaded.")
+            print("Selected single item: " + selected + ". Other items will not be submitted.")
+        print(f"\nReady for a new attempt: {len(ready)}. Held by local guards: {sum(is_guarded(item.output) for item in items)}. Need preparation: {len(problems)}.")
         for name, reason in problems.items():
             print(name + ": " + reason)
         preview = workspace(root) / "preview.html"
@@ -134,6 +153,21 @@ def main() -> int:
             print("No unguarded items are ready. Review Seller Hub before releasing an item.")
             return 1 if problems else 0
         print("Review the preparation. A token is needed for this run. Closing loses task references; remote work may continue.")
+        if not args.item:
+            # Default interactive use also requires an exact selection. An API integration
+            # that has never been verified live must not silently send the whole batch.
+            print("Draft feed compatibility remains unverified. Select ONE item for this session.")
+            selected = input("Exact ready item folder name, or Enter to stop: ").strip()
+            if not selected:
+                return 0
+            ready = [item for item in ready if item.folder.name == selected]
+            if len(ready) != 1:
+                raise AppError("That exact folder is not ready and unguarded. Nothing was uploaded.")
+        print("Before any new attempt, resolve ALL previous uploads in Seller Hub Drafts and Reports.")
+        print("An absent draft is not proof of failure while remote work may still be processing.")
+        if input("Type RESOLVED only after that review, or Enter to stop: ").strip() != "RESOLVED":
+            print("Stopped before authentication. Existing guards are unchanged.")
+            return 0
         if input("Type DRAFT to continue, or press Enter to stop: ").strip() != "DRAFT":
             print("Stopped before authentication. Nothing was uploaded.")
             return 0
